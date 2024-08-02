@@ -1,0 +1,23 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Hardhat files
+cache
+artifacts
+
+# ide files
+.vscode
+.idea
+
+# debug
+dbg.project.json
+artifacts-dbg/*
+contracts-dbg/*
+.openzeppelin/*
+scripts/dev/*
+scripts/RateMsg/config.json
+wake.toml
