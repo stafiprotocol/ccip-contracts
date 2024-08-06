@@ -7,7 +7,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Deploy to Source Chain
 echo "Deploying to Source Chain..." >&2
-chain_source_result=$(npx hardhat run ${SCRIPT_DIR}/deploy_rate_msg_source.js --network ${NETWORK_SOURCE} 2>&1 | tee >(cat >&2))
+chain_source_result=$(npx hardhat run ${SCRIPT_DIR}/deploy_source.js --network ${NETWORK_SOURCE} 2>&1 | tee >(cat >&2))
 
 # Extract addresses from Source Chain deployment
 json_output=$(echo "$chain_source_result" | grep -o '{.*}' | tail -n 1)
@@ -24,7 +24,7 @@ fi
 # Deploy to Destination Chain
 echo "Deploying to Destination Chain..." >&2
 export RATE_SENDER_ADDRESS=$rate_sender_address
-chain_destination_result=$(RATE_SENDER_ADDRESS=$rate_sender_address npx hardhat run ${SCRIPT_DIR}/deploy_rate_msg_destination.js --network ${NETWORK_DESTINATION} 2>&1 | tee >(cat >&2))
+chain_destination_result=$(RATE_SENDER_ADDRESS=$rate_sender_address npx hardhat run ${SCRIPT_DIR}/deploy_destination.js --network ${NETWORK_DESTINATION} 2>&1 | tee >(cat >&2))
 
 # Extract addresses from Destination Chain deployment
 rate_receiver_address=$(echo "$chain_destination_result" | grep -o '{.*}' | jq -r .rateReceiverAddress)
