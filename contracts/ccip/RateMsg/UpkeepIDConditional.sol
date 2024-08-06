@@ -17,20 +17,6 @@ struct RegistrationParams {
     uint96 amount;
 }
 
-// https://docs.chain.link/chainlink-automation/guides/register-upkeep-in-contract
-/**
- * string name = "test upkeep";
- * bytes encryptedEmail = 0x;
- * address upkeepContract = 0x...;
- * uint32 gasLimit = 500000;
- * address adminAddress = 0x....;
- * uint8 triggerType = 0;
- * bytes checkData = 0x;
- * bytes triggerConfig = 0x;
- * bytes offchainConfig = 0x;
- * uint96 amount = 1000000000000000000;
- */
-
 interface AutomationRegistrarInterface {
     function registerUpkeep(RegistrationParams calldata requestParams) external returns (uint256);
 }
@@ -43,43 +29,54 @@ contract UpkeepIDConditional is Ownable {
     event LinkUpdated(address newLink);
     event RegistrarUpdated(address newRegistrar);
 
+    error InvalidLinkAddress();
+    error InvalidRegistrarAddress();
+    error InvalidAmount();
+    error InvalidUpkeepContractAddress();
+    error InvalidAdminAddress();
+    error LinkTransferFailed();
+    error LinkApprovalFailed();
+    error UpkeepRegistrationFailed();
+    error InvalidWithdrawAddress();
+    error InvalidWithdrawAmount();
+
     constructor(LinkTokenInterface link, AutomationRegistrarInterface registrar) Ownable(msg.sender) {
-        require(address(link) != address(0), "Invalid LINK address");
-        require(address(registrar) != address(0), "Invalid registrar address");
+        if (address(link) == address(0)) revert InvalidLinkAddress();
+        if (address(registrar) == address(0)) revert InvalidRegistrarAddress();
         i_link = link;
         i_registrar = registrar;
     }
 
     function setLink(LinkTokenInterface _link) external onlyOwner {
-        require(address(_link) != address(0), "Invalid LINK address");
+        if (address(_link) == address(0)) revert InvalidLinkAddress();
         i_link = _link;
         emit LinkUpdated(address(_link));
     }
 
     function setRegistrar(AutomationRegistrarInterface _registrar) external onlyOwner {
-        require(address(_registrar) != address(0), "Invalid registrar address");
+        if (address(_registrar) == address(0)) revert InvalidRegistrarAddress();
         i_registrar = _registrar;
         emit RegistrarUpdated(address(_registrar));
     }
 
     function registerAndPredictID(RegistrationParams calldata params) external returns (uint256) {
-        require(params.amount > 0, "Amount must be greater than 0");
-        require(params.upkeepContract != address(0), "Invalid upkeep contract address");
-        require(params.adminAddress != address(0), "Invalid admin address");
+        if (params.amount == 0) revert InvalidAmount();
+        if (params.upkeepContract == address(0)) revert InvalidUpkeepContractAddress();
+        if (params.adminAddress == address(0)) revert InvalidAdminAddress();
 
-        require(i_link.transferFrom(msg.sender, address(this), params.amount), "LINK transfer failed");
-        require(i_link.approve(address(i_registrar), params.amount), "LINK approval failed");
+        if (!i_link.transferFrom(msg.sender, address(this), params.amount)) revert LinkTransferFailed();
+        if (!i_link.approve(address(i_registrar), params.amount)) revert LinkApprovalFailed();
 
         uint256 upkeepID = i_registrar.registerUpkeep(params);
-        require(upkeepID != 0, "Upkeep registration failed");
+        if (upkeepID == 0) revert UpkeepRegistrationFailed();
 
         emit UpkeepRegistered(upkeepID, params);
         return upkeepID;
     }
 
     function withdrawLink(address to, uint256 amount) external onlyOwner {
-        require(to != address(0), "Invalid address");
-        require(amount > 0, "Amount must be greater than 0");
-        require(i_link.transfer(to, amount), "LINK transfer failed");
+        if (to == address(0)) revert InvalidWithdrawAddress();
+        if (amount == 0) revert InvalidWithdrawAmount();
+        if (!i_link.transfer(to, amount)) revert LinkTransferFailed();
     }
 }
