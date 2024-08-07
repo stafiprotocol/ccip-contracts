@@ -10,7 +10,7 @@ async function main() {
     const RegisterUpkeep = await ethers.getContractFactory("RegisterUpkeep");
 
     // Replace these addresses with actual values for your network
-    const linkAddress = "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59"; // LINK token address
+    const linkAddress = "0x779877A7B0D9E8603169DdbD7836e478b4624789"; // LINK token address
     const registrarAddress = "0xb0E49c5D0d05cbc241d68c05BC5BA1d1B7B72976"; // Replace with actual AutomationRegistrar address
     const adminAddress = deployer.address; // Using deployer as admin, you can change this
 
