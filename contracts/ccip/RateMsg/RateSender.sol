@@ -327,9 +327,6 @@ contract RateSender is
     function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
         for (uint i = 0; i < tokenNames.length; i++) {
             TokenInfo storage tokenInfo = tokenInfos[tokenNames[i]];
-            if (tokenInfo.rateSource == address(0)) {
-                continue;
-            }
             uint256 newRate = ITokenRate(tokenInfo.rateSource).getRate();
             if (tokenInfo.latestRate != newRate && tokenInfo.chainSelectors.length() > 0) {
                 return (true, abi.encode(tokenNames[i]));
@@ -345,7 +342,12 @@ contract RateSender is
             revert TransferNotAllow();
         }
         string memory tokenName = abi.decode(performData, (string));
-        sendTokenRate(tokenName);
+
+        TokenInfo storage tokenInfo = tokenInfos[tokenName];
+        uint256 newRate = ITokenRate(tokenInfo.rateSource).getRate();
+        if (tokenInfo.latestRate != newRate && tokenInfo.chainSelectors.length() > 0) {
+            sendTokenRate(tokenName);
+        }
     }
 
     /// @notice Internal function to send token rate to all registered chains
