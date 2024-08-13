@@ -6,8 +6,8 @@ async function main() {
     // Get the ContractFactory and Signer
     const MockToken = await hre.ethers.getContractFactory("MockToken");
 
-    // Set the initial rate (adjust as needed)
-    const initialRate = hre.ethers.parseUnits("1", 18);  // 1 with 18 decimal places
+    // Get the initial rate from command line arguments or environment variable
+    let initialRate = process.env.INITIAL_RATE;
 
     // Deploy the contract
     const mockToken = await MockToken.deploy(initialRate);

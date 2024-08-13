@@ -44,7 +44,7 @@ async function main() {
     console.log("CCIPRateProvider deployed to:", deployedAddress);
 
     // Verify the contract on Etherscan
-    if (process.env.ETHERSCAN_API_KEY) {
+    if (hre.network.name !== "hardhat" && hre.network.name !== "local" && process.env.ETHERSCAN_API_KEY) {
         console.log("Verifying contract on Etherscan...");
         try {
             await hre.run("verify:verify", {

@@ -3,12 +3,12 @@
     "routerAddressDestination": "0x...",
     "linkAddressSource": "0x...",
     "linkAddressDestination": "0x...",
-    "initialRate": "1", // Initial rate for the ccip rate provider
+    "initialRate": "1000000000000000000", // Initial rate for the ccip rate provider
     "tokens": [
         {
             "name": "TestToken",
             "address": "", // When the address is empty, the script deploys mock's token
-            "initialRate": "1"
+            "initialRate": "1000000000000000000"
         }
     ]
 }
