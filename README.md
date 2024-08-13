@@ -5,11 +5,11 @@
 ## Contract(Rate CCIP Message) deploy
 
 ### manual deployment
-1. deploy Receiver
-2. deploy CCIPRateProvider (rate+address(Receiver))
-3. deploy Sender (router address https://docs.chain.link/ccip/supported-networks)
+1. deploy Sender (router address https://docs.chain.link/ccip/supported-networks)
    * deploy
    * addTokenInfo
+2. deploy Receiver
+3. deploy CCIPRateProvider (rate+address(Receiver))
 4. send link to Sender
 
 ### automatic deployment
@@ -20,7 +20,7 @@ cp ./scripts/RateMsg/config.example.json ./scripts/RateMsg/config.json
 
 ```bash
 # chain_source, chain_dst Need to be configured in hardhat.config.js
-NETWORK_SOURCE=chain_source NETWORK_DESTINATION=chain_dst ./scripts/RateMsg/deploy_rate_msg_all.sh
+NETWORK_SOURCE=chain_source NETWORK_DESTINATION=chain_dst ./scripts/RateMsg/deploy_all.sh
 ```
 
 ### Configure RateSender at ccip automation
