@@ -1,0 +1,8 @@
+{
+  "routerAddressSource": "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59",
+  "routerAddressDestination": "0xF694E193200268f9a4868e4Aa017A0118C9a8177",
+  "linkAddressSource": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+  "linkAddressDestination": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+  "initialRate": "1000000000000000000",
+  "tokens": []
+}
