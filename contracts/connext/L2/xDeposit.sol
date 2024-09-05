@@ -47,6 +47,7 @@ contract XDeposit is
 
     // Constants
     uint32 public constant BPS_BASIS = 10000; // 30 basis points = 0.3%
+    uint32 public constant MAX_BPS = 1000; // 1000 basis points = 10%
     uint256 public constant EIGHTEEN_DECIMALS = 1e18;
 
     // Access control roles
@@ -184,6 +185,8 @@ contract XDeposit is
      * @return Amount of xLrd tokens minted
      */
     function _deposit(uint256 amountIn, uint256 deadline, uint256 slippage) internal returns (uint256) {
+        if (block.timestamp > deadline) revert DeadlineExpired();
+
         uint256 relayFee = (amountIn * relayFeeBps) / BPS_BASIS;
         amountIn -= relayFee;
         remUnwarpRelayFee += relayFee;
@@ -330,6 +333,9 @@ contract XDeposit is
      * @notice The value should be within a reasonable range (e.g., 0-1000) to avoid excessive fees
      */
     function updateRouterFeeBps(uint256 _routerFeeBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_routerFeeBps > MAX_BPS) {
+            revert InvalidBpsParam();
+        }
         emit RouterFeeBpsUpdated(routerFeeBps, _routerFeeBps);
         routerFeeBps = _routerFeeBps;
     }
@@ -342,6 +348,10 @@ contract XDeposit is
      * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
     function updateMintSubtractBps(uint256 _mintSubtractBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_mintSubtractBps > MAX_BPS) {
+            revert InvalidBpsParam();
+        }
+        emit MintSubtractBpsUpdated(mintSubtractBps, _mintSubtractBps);
         mintSubtractBps = _mintSubtractBps;
     }
 
@@ -353,6 +363,10 @@ contract XDeposit is
      * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
     function updateRelayFeeBps(uint256 _relayFeeBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_relayFeeBps > MAX_BPS) {
+            revert InvalidBpsParam();
+        }
+        emit RelayFeeBpsUpdated(relayFeeBps, _relayFeeBps);
         relayFeeBps = _relayFeeBps;
     }
 
@@ -361,7 +375,11 @@ contract XDeposit is
      * @return Current exchange rate
      */
     function getRate() public view returns (uint256) {
-        return ICCIPRateProvider(rateProvider).getRate();
+        uint256 rate = ICCIPRateProvider(rateProvider).getRate();
+        if (rate < 1 * EIGHTEEN_DECIMALS) {
+            revert InvalidRate();
+        }
+        return rate;
     }
 
     /**

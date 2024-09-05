@@ -8,9 +8,12 @@ interface IXDeposit {
     error TransferFailed();
     error InvalidDomain();
     error InvalidAddress();
+    error InvalidBpsParam();
     error ZeroAmountReceived();
     error NotEnoughBalance();
     error ETHWrappingFailed();
+    error DeadlineExpired();
+    error InvalidRate();
     error InvalidContract(string param);
 
     // Events for logging important contract actions
@@ -19,6 +22,8 @@ interface IXDeposit {
     event BridgeExecuted(uint32 destinationDomain, address destinationTarget, address delegate, uint256 amount);
     event RateProviderUpdated(address newProvider, address oldProvider);
     event RouterFeeBpsUpdated(uint256 oldRouterFeeBps, uint256 newoldRouterFeeBps);
+    event MintSubtractBpsUpdated(uint256 oldSubtractBps, uint256 newSubtractBps);
+    event RelayFeeBpsUpdated(uint256 oldRelayFeeBps, uint256 newRelayFeeBps);
 
     function depositETH(uint256 deadline,uint256 slippage) external payable returns (uint256);
 
