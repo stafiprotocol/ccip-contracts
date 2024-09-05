@@ -39,6 +39,9 @@ contract XDeposit is
 
     // Bridge-related parameters
     uint256 public routerFeeBps;
+    uint256 public relayFeeBps;
+    uint256 public mintSubtractBps;
+    uint256 public remUnwarpRelayFee;
     uint32 public destinationDomain; // https://docs.connext.network/resources/deployments
     address public recipient;
 
@@ -58,14 +61,13 @@ contract XDeposit is
      * @dev Initializes the contract with necessary parameters and sets up initial roles
      * @param _xLrd Address of the xLrd token contract
      * @param _wETH Address of the WETH token contract
-     * @param _nextWETH Address of the nextWETH token contract
+     * @param _nextWETH Address of the nextWETH token contract used for cross-chain operations
      * @param _connext Address of the Connext contract for cross-chain operations
      * @param _rateProvider Address of the rate provider contract
      * @param _destinationDomain Domain ID of the destination chain for bridging
      * @param _recipient Target address on the destination chain for bridging
      * @param bridgeAdmin Address to be granted bridge admin roles
-    * @param admin Address of the initial admin
-     *
+     * @param admin Address of the initial admin
      */
     function initialize(
         IERC20 _xLrd,
@@ -85,7 +87,7 @@ contract XDeposit is
         if (!address(_nextWETH).isContract()) revert InvalidContract("_nextWETH");
         if (!address(_connext).isContract()) revert InvalidContract("_connext");
 
-        if (_destinationDomain == 0 ) {
+        if (_destinationDomain == 0) {
             revert InvalidDomain();
         }
 
@@ -115,12 +117,28 @@ contract XDeposit is
         routerFeeBps = 5; // Connext router fee is 5 basis points (0.05%)
     }
 
+    /// @notice Pause the contract
+    /// @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    /// @notice Unpause the contract
+    /// @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+    }
+
     /**
      * @dev Allows users to deposit ETH, which is then wrapped to WETH and processed
      * @param deadline Timestamp by which the transaction must be included to be valid
+     * @param slippage Maximum acceptable slippage for the swap, in basis points (e.g., 100 = 1%)
      * @return Amount of xLrd tokens minted
      */
-    function depositETH(uint256 deadline) external payable whenNotPaused nonReentrant returns (uint256) {
+    function depositETH(
+        uint256 deadline,
+        uint256 slippage
+    ) external payable whenNotPaused nonReentrant returns (uint256) {
         if (msg.value == 0) {
             revert ZeroAmountReceived();
         }
@@ -134,32 +152,42 @@ contract XDeposit is
             revert ETHWrappingFailed();
         }
 
-        return _deposit(newlyWrappedWETH, deadline);
+        return _deposit(newlyWrappedWETH, deadline, slippage);
     }
 
     /**
      * @dev Allows users to deposit WETH directly
      * @param amount Amount of WETH to deposit
      * @param deadline Timestamp by which the transaction must be included to be valid
+     * @param slippage Maximum acceptable slippage for the swap, in basis points (e.g., 100 = 1%)
      * @return Amount of xLrd tokens minted
      */
-    function depositWETH(uint256 amount, uint256 deadline) external whenNotPaused nonReentrant returns (uint256) {
+    function depositWETH(
+        uint256 amount,
+        uint256 deadline,
+        uint256 slippage
+    ) external whenNotPaused nonReentrant returns (uint256) {
         if (amount == 0) {
             revert ZeroAmountReceived();
         }
 
         wETH.safeTransferFrom(msg.sender, address(this), amount);
 
-        return _deposit(amount, deadline);
+        return _deposit(amount, deadline, slippage);
     }
 
     /**
      * @dev Internal function to process deposits, swap WETH for nextWETH, and mint xLrd tokens
      * @param amountIn Amount of WETH to process
      * @param deadline Timestamp by which the transaction must be included to be valid
+     * @param slippage Maximum acceptable slippage for the swap, in basis points (e.g., 100 = 1%)
      * @return Amount of xLrd tokens minted
      */
-    function _deposit(uint256 amountIn, uint256 deadline) internal returns (uint256) {
+    function _deposit(uint256 amountIn, uint256 deadline, uint256 slippage) internal returns (uint256) {
+        uint256 relayFee = (amountIn * relayFeeBps) / BPS_BASIS;
+        amountIn -= relayFee;
+        remUnwarpRelayFee += relayFee;
+
         // Approve the deposit asset to the connext contract
         wETH.safeIncreaseAllowance(address(connext), amountIn);
 
@@ -168,12 +196,16 @@ contract XDeposit is
         uint32 domain = tokenId.domain;
         bytes32 id = tokenId.id;
 
+        uint256 minNextWETH = 0;
+        if (slippage > 0) {
+            minNextWETH = (amountIn * (BPS_BASIS - slippage)) / BPS_BASIS;
+        }
         uint256 amountNextWETH = connext.swapExact(
             keccak256(abi.encode(id, domain)),
             amountIn,
             address(wETH),
             address(nextWETH),
-            0,
+            minNextWETH,
             deadline
         );
 
@@ -189,6 +221,10 @@ contract XDeposit is
 
         // Calculate the amount of xLrd to mint
         uint256 xLrdAmount = (EIGHTEEN_DECIMALS * amountNextWETH) / getRate();
+        // Reduce the number of xLrdAmount mint by mintSubtractBps
+        if (mintSubtractBps > 0) {
+            xLrdAmount = (xLrdAmount * (BPS_BASIS - mintSubtractBps)) / BPS_BASIS;
+        }
 
         // Mint xLrd to the user
         IXERC20(address(xLrd)).mint(msg.sender, xLrdAmount);
@@ -197,31 +233,36 @@ contract XDeposit is
         return xLrdAmount;
     }
 
-
-    /**
-     * @dev Retrieves the current exchange rate from the rate provider
-     * @return Current exchange rate
-     */
-    function getRate() public view returns (uint256) {
-        return ICCIPRateProvider(rateProvider).getRate();
-    }
-
     /**
      * @dev Executes the bridge operation, transferring nextWETH to the L1 contract
      * This function should only be callable by accounts with BRIDGE_ADMIN_ROLE
-     * The required relay fee needs to be estimated under the chain
+     * @param relayFee The fee required for relaying the transaction across chains
+     * @notice The required relay fee needs to be estimated based on the current chain conditions
      */
-    function executeBridge() external payable whenNotPaused nonReentrant onlyRole(BRIDGE_ADMIN_ROLE) {
+    function executeBridge(uint256 relayFee) external payable whenNotPaused nonReentrant onlyRole(BRIDGE_ADMIN_ROLE) {
         uint256 balance = nextWETH.balanceOf(address(this));
         if (balance == 0) {
             revert NotEnoughBalance();
+        }
+
+        // Check if the remaining relay fee + current ETH balance is sufficient to pay the relayFee, return an error if insufficient
+        if (remUnwarpRelayFee + address(this).balance < relayFee) {
+            revert NotEnoughBalance();
+        }
+
+        // If the contract's native ETH balance can cover the relayFee, pay directly;
+        // otherwise, withdraw the corresponding amount of WETH to ETH from remUnwarpRelayFee
+        if (address(this).balance < relayFee) {
+            // Withdraw remUnwarpRelayFee worth of WETH to pay the relay fee
+            uint256 amountToWithdraw = remUnwarpRelayFee;
+            IWeth(address(wETH)).withdraw(amountToWithdraw);
+            remUnwarpRelayFee = 0; // Reset remaining relay fee after withdrawal
         }
 
         // Approve nextWETH to the connext contract
         nextWETH.safeIncreaseAllowance(address(connext), balance);
 
         // Execute the cross-chain transfer
-        uint256 relayFee = msg.value;
         connext.xcall{value: relayFee}(
             destinationDomain,
             recipient,
@@ -252,7 +293,7 @@ contract XDeposit is
      * @param token Address of the ERC20 token to withdraw
      * @param to Address to receive the withdrawn tokens
      */
-    function withdrawERC20(address token,address to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdrawERC20(address token, address to) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance == 0) revert NotEnoughBalance();
         IERC20(token).safeTransfer(to, balance);
@@ -262,6 +303,7 @@ contract XDeposit is
      * @dev Grants or revokes the BRIDGE_ADMIN_ROLE for a given address
      * @param bridgeExecutor Address to grant or revoke the BRIDGE_ADMIN_ROLE
      * @param allowed If true, grants the role; if false, revokes the role
+     * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
     function setBridgeExecutor(address bridgeExecutor, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (allowed) {
@@ -282,14 +324,44 @@ contract XDeposit is
         emit RateProviderUpdated(oldProvider, address(_rateProvider));
     }
 
-
     /**
      * @dev Updates the bridge router fee in basis points
-     * @param _routerFeeBps New bridge router fee in basis points
+     * @param _routerFeeBps New bridge router fee in basis points (e.g., 30 = 0.3%)
+     * @notice The value should be within a reasonable range (e.g., 0-1000) to avoid excessive fees
      */
     function updateRouterFeeBps(uint256 _routerFeeBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit RouterFeeBpsUpdated(routerFeeBps, _routerFeeBps);
         routerFeeBps = _routerFeeBps;
+    }
+
+    /**
+     * @dev Updates the mint subtract basis points
+     * @param _mintSubtractBps New mint subtract value in basis points
+     * @notice This value is used to reduce the amount of xLrd minted during deposits
+     * @notice The value is in basis points, where 10000 = 100%. For example, 100 = 1%
+     * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
+     */
+    function updateMintSubtractBps(uint256 _mintSubtractBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        mintSubtractBps = _mintSubtractBps;
+    }
+
+    /**
+     * @dev Updates the relay fee basis points
+     * @param _relayFeeBps New relay fee value in basis points
+     * @notice This fee is deducted from the deposit amount to cover relay costs
+     * @notice The value is in basis points, where 10000 = 100%. For example, 30 = 0.3%
+     * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
+     */
+    function updateRelayFeeBps(uint256 _relayFeeBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        relayFeeBps = _relayFeeBps;
+    }
+
+    /**
+     * @dev Retrieves the current exchange rate from the rate provider
+     * @return Current exchange rate
+     */
+    function getRate() public view returns (uint256) {
+        return ICCIPRateProvider(rateProvider).getRate();
     }
 
     /**

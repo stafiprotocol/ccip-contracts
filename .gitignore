@@ -21,3 +21,4 @@ contracts-dbg/*
 scripts/dev/*
 scripts/RateMsg/config.json
 wake.toml
+.history/*

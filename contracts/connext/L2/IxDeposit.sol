@@ -20,13 +20,13 @@ interface IXDeposit {
     event RateProviderUpdated(address newProvider, address oldProvider);
     event RouterFeeBpsUpdated(uint256 oldRouterFeeBps, uint256 newoldRouterFeeBps);
 
-    function depositETH(uint256 deadline) external payable returns (uint256);
+    function depositETH(uint256 deadline,uint256 slippage) external payable returns (uint256);
 
-    function depositWETH(uint256 amount, uint256 deadline) external returns (uint256);
+    function depositWETH(uint256 amount, uint256 deadline,uint256 slippage) external returns (uint256);
 
     function getRate() external view returns (uint256);
 
-    function executeBridge() external payable;
+    function executeBridge(uint256 relayFee) external payable;
 
     function withdrawNative(address to) external;
 
