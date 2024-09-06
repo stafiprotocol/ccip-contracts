@@ -1,0 +1,10 @@
+{
+    "xerc20FactoryAddress": "",
+    "name": "",
+    "symbol": "",
+    "minterLimits": [100], // 100000000000000000000wei
+    "burnerLimits": [100], // 100000000000000000000wei
+    "bridges": [""],
+    "baseToken": "",
+    "isNative": false
+  }
