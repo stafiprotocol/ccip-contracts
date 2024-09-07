@@ -2,7 +2,7 @@ const hre = require("hardhat");
 const fs = require('fs');
 const path = require('path');
 
-const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+const config = JSON.parse(fs.readFileSync(path.join(__dirname, '/config/config_XERC20.json'), 'utf8'));
 
 async function deployXERC20(deployer, xerc20FactoryAddress, name, symbol, minterLimits, burnerLimits, bridges) {
   console.log("Deploying XERC20...");

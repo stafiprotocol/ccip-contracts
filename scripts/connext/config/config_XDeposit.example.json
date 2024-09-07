@@ -1,0 +1,10 @@
+{
+    "LRD": "",
+    "WETH": "",
+    "NEXTWETH": "",
+    "CONNEXT": "",
+    "RATEPROVIDER": "",
+    "DESTINATIONDOMAIN": "", //https://docs.connext.network/resources/deployments#contract-deployments
+    "RECIPIENT": "",
+    "BRIDGEADMIN": ""
+  }

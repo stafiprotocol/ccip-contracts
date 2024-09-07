@@ -23,3 +23,6 @@ scripts/RateMsg/config.json
 wake.toml
 .history/*
 scripts/connext/config.json
+scripts/connext/config/config_XDeposit.json
+scripts/connext/config/config_XERC20.json
+scripts/connext/config/config_XStake.json
